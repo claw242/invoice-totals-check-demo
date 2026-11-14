@@ -1,0 +1,86 @@
+{
+  "name": "Loupe & Lettres — Invoice totals check",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Loupe & Lettres — créé avec l'aide de l'IA\n\n### How it works\nThis manual workflow checks the totals of one invoice with integer arithmetic. Each line amount is rounded half-up to the cent; VAT is rounded by ONE rule you choose (vatRounding: per_group = once per VAT rate, the default, or per_line). It returns line amounts, VAT per rate, totals, a check against the total you stated (declaredTotal, optional), a suggested next number and a printable HTML page. The workflow adds no node that sends or stores data and needs no account, API, credential or AI model. Your n8n instance may keep the inputs and outputs in its execution history, depending on its configuration.\n\n### Setup\nImport this JSON into a fresh workflow and run it once with the synthetic invoice in “Example invoice”. Then replace invoiceNumber, issueDate (YYYY-MM-DD), currency (EUR, USD, GBP or CHF), lines (description, quantity up to 3 decimals, unitPrice up to 4 decimals, vatRate in percent) and optionally seller, buyer, declaredTotal and vatRounding. Quantities, prices and rates are plain non-negative decimals written as text, for example \"19.99\".\n\n### Read this\nThe workflow stores no counter: suggestedNextNumber only increments the trailing digits of the number you give it. You must keep the real counter yourself and check that a number is unused. The HTML page is a layout, not a legal invoice validator: required mentions depend on your country and status. Not accounting or tax advice. To get a PDF, open the html field in a browser and print to PDF.",
+        "height": 650,
+        "width": 760,
+        "color": 3
+      },
+      "id": "overview",
+      "name": "Overview and setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        -560
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "manual",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\"invoiceNumber\":\"F-2026-0007\",\"issueDate\":\"2026-11-01\",\"currency\":\"EUR\",\"seller\":\"Example Studio\\n1 Sample Street\\n00000 Sampletown\",\"buyer\":\"Example Customer <test>\",\"declaredTotal\":\"60.30\",\"lines\":[{\"description\":\"Consulting hours\",\"quantity\":\"2.5\",\"unitPrice\":\"19.99\",\"vatRate\":\"20\"},{\"description\":\"Sticker\",\"quantity\":\"1\",\"unitPrice\":\"0.10\",\"vatRate\":\"5\"},{\"description\":\"Sticker\",\"quantity\":\"1\",\"unitPrice\":\"0.10\",\"vatRate\":\"5\"},{\"description\":\"Sticker\",\"quantity\":\"1\",\"unitPrice\":\"0.10\",\"vatRate\":\"5\"}]} }];"
+      },
+      "id": "example",
+      "name": "Example invoice",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "'use strict';\n\n// Loupe & Lettres — créé avec l'aide de l'IA\n// Invoice totals with integer arithmetic (BigInt): one explicit rounding rule, a stated-total check and a printable HTML page.\n// Pure function of its input: it keeps no state, so it cannot guarantee that an invoice number is unused.\nconst CURRENCIES = new Set(['EUR', 'USD', 'GBP', 'CHF']);\nconst MAX_LINES = 200;\nconst MAX_CENTS = 10n ** 13n;\n\nfunction scaled(value, maxDecimals, label) {\n  const text = typeof value === 'number' ? String(value) : value;\n  if (typeof text !== 'string' || !new RegExp(`^\\\\d+(?:\\\\.\\\\d{1,${maxDecimals}})?$`).test(text.trim())) {\n    throw new Error(`${label} must be a non-negative decimal with at most ${maxDecimals} decimals`);\n  }\n  const [whole, fraction = ''] = text.trim().split('.');\n  return BigInt(whole + fraction.padEnd(maxDecimals, '0'));\n}\nconst halfUp = (numerator, denominator) => (numerator + denominator / 2n) / denominator;\nconst money = cents => `${cents / 100n}.${String(cents % 100n).padStart(2, '0')}`;\nconst plain = (scaledValue, decimals) => {\n  const digits = String(scaledValue).padStart(decimals + 1, '0');\n  const whole = digits.slice(0, digits.length - decimals), fraction = digits.slice(digits.length - decimals).replace(/0+$/, '');\n  return fraction ? `${whole}.${fraction}` : whole;\n};\nconst toNumber = (cents, label) => {\n  if (cents > MAX_CENTS) throw new Error(`${label} is too large`);\n  return Number(cents);\n};\nconst escapeHtml = text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#39;');\n\nfunction validDate(text) {\n  const match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(typeof text === 'string' ? text : '');\n  if (!match) return false;\n  const [year, month, day] = match.slice(1).map(Number);\n  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);\n  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];\n  return year >= 1900 && year <= 2199 && month >= 1 && month <= 12 && day >= 1 && day <= days[month - 1];\n}\n\n// Suggests the number after `last` by incrementing its trailing digits and keeping the zero padding.\nfunction nextInvoiceNumber(last) {\n  const match = /^(.*?)(\\d+)$/s.exec(typeof last === 'string' ? last.trim() : '');\n  if (!match) throw new Error('Invoice number must end with digits to be incremented');\n  const next = String(BigInt(match[2]) + 1n).padStart(match[2].length, '0');\n  return match[1] + next;\n}\n\nfunction computeInvoice(input) {\n  if (!input || typeof input !== 'object') throw new Error('Input must be an object');\n  const invoiceNumber = typeof input.invoiceNumber === 'string' ? input.invoiceNumber.trim() : '';\n  if (!invoiceNumber || invoiceNumber.length > 40) throw new Error('invoiceNumber must be 1 to 40 characters');\n  if (!validDate(input.issueDate)) throw new Error('issueDate must be a valid calendar date YYYY-MM-DD');\n  const currency = typeof input.currency === 'string' ? input.currency.trim().toUpperCase() : '';\n  if (!CURRENCIES.has(currency)) throw new Error('currency must be EUR, USD, GBP or CHF');\n  const vatRounding = input.vatRounding === undefined ? 'per_group' : input.vatRounding;\n  if (vatRounding !== 'per_group' && vatRounding !== 'per_line') throw new Error('vatRounding must be per_group or per_line');\n  for (const name of ['seller', 'buyer']) {\n    if (input[name] !== undefined && (typeof input[name] !== 'string' || input[name].length > 300)) throw new Error(`${name} must be text of at most 300 characters`);\n  }\n  if (!Array.isArray(input.lines) || input.lines.length < 1 || input.lines.length > MAX_LINES) throw new Error(`lines must be a list of 1 to ${MAX_LINES} items`);\n\n  const groups = new Map();\n  const lines = input.lines.map((line, i) => {\n    const n = i + 1;\n    try {\n      if (!line || typeof line !== 'object') throw new Error('line must be an object');\n      const description = typeof line.description === 'string' ? line.description.trim() : '';\n      if (!description || description.length > 200) throw new Error('description must be 1 to 200 characters');\n      const quantity = scaled(line.quantity, 3, 'quantity');\n      if (quantity === 0n) throw new Error('quantity must be greater than zero');\n      const unitPrice = scaled(line.unitPrice, 4, 'unitPrice');\n      const rate = scaled(line.vatRate, 2, 'vatRate');\n      if (rate > 10000n) throw new Error('vatRate must be between 0 and 100');\n      const net = halfUp(quantity * unitPrice, 100000n);\n      const lineVat = halfUp(net * rate, 10000n);\n      const group = groups.get(rate) || { net: 0n, lineVat: 0n };\n      groups.set(rate, { net: group.net + net, lineVat: group.lineVat + lineVat });\n      return { line: n, description, quantity: plain(quantity, 3), unitPrice: plain(unitPrice, 4), vatRate: plain(rate, 2), netCents: toNumber(net, 'line amount'), vatCents: vatRounding === 'per_line' ? toNumber(lineVat, 'line VAT') : null };\n    } catch (error) { throw new Error(`Line ${n}: ${error.message}`); }\n  });\n\n  const vatGroups = [...groups].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([rate, g]) => {\n    const vat = vatRounding === 'per_line' ? g.lineVat : halfUp(g.net * rate, 10000n);\n    return { vatRate: plain(rate, 2), netCents: toNumber(g.net, 'group amount'), vatCents: toNumber(vat, 'group VAT') };\n  });\n  const net = vatGroups.reduce((sum, g) => sum + BigInt(g.netCents), 0n);\n  const vat = vatGroups.reduce((sum, g) => sum + BigInt(g.vatCents), 0n);\n  const totals = { netCents: toNumber(net, 'total'), vatCents: toNumber(vat, 'total VAT'), grossCents: toNumber(net + vat, 'total') };\n\n  let check = null;\n  if (input.declaredTotal !== undefined && input.declaredTotal !== null && input.declaredTotal !== '') {\n    const declared = scaled(input.declaredTotal, 2, 'declaredTotal');\n    check = { declaredCents: toNumber(declared, 'declaredTotal'), computedCents: totals.grossCents, matches: declared === net + vat, differenceCents: Number(declared - net - vat) };\n  }\n\n  let suggestedNextNumber = null;\n  try { suggestedNextNumber = nextInvoiceNumber(invoiceNumber); } catch (error) { suggestedNextNumber = null; }\n\n  const cell = text => `<td>${escapeHtml(text)}</td>`;\n  const num = text => `<td class=\"n\">${escapeHtml(text)}</td>`;\n  const html = [\n    '<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>' + escapeHtml(`Invoice ${invoiceNumber}`) + '</title>',\n    '<style>body{font-family:Arial,sans-serif;margin:2rem;color:#111}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border-bottom:1px solid #ccc;padding:.35rem;text-align:left}.n{text-align:right}tfoot td{font-weight:bold}small{color:#555}@media print{body{margin:0}}</style></head><body>',\n    `<h1>Invoice ${escapeHtml(invoiceNumber)}</h1><p>Date: ${escapeHtml(input.issueDate)} &middot; Currency: ${currency}</p>`,\n    input.seller ? `<p><strong>From</strong><br>${escapeHtml(input.seller).replace(/\\n/g, '<br>')}</p>` : '',\n    input.buyer ? `<p><strong>To</strong><br>${escapeHtml(input.buyer).replace(/\\n/g, '<br>')}</p>` : '',\n    '<table><thead><tr><th>Description</th><th class=\"n\">Qty</th><th class=\"n\">Unit price</th><th class=\"n\">VAT %</th><th class=\"n\">Net</th></tr></thead><tbody>',\n    ...lines.map(l => `<tr>${cell(l.description)}${num(l.quantity)}${num(l.unitPrice)}${num(l.vatRate)}${num(money(BigInt(l.netCents)))}</tr>`),\n    '</tbody><tfoot>',\n    ...vatGroups.map(g => `<tr><td colspan=\"4\">VAT ${escapeHtml(g.vatRate)}% on ${escapeHtml(money(BigInt(g.netCents)))}</td>${num(money(BigInt(g.vatCents)))}</tr>`),\n    `<tr><td colspan=\"4\">Total net</td>${num(money(net))}</tr><tr><td colspan=\"4\">Total VAT</td>${num(money(vat))}</tr><tr><td colspan=\"4\">Total to pay (${currency})</td>${num(money(net + vat))}</tr>`,\n    '</tfoot></table>',\n    '<small>Computed with a free Loupe &amp; Lettres workflow (créé avec l\\'aide de l\\'IA). Legal invoice mentions depend on your country and status; check them yourself.</small></body></html>',\n  ].join('\\n');\n\n  return {\n    invoiceNumber, issueDate: input.issueDate, currency, vatRounding,\n    lines, vatGroups, totals, check, suggestedNextNumber,\n    totalsText: { net: money(net), vat: money(vat), gross: money(net + vat) },\n    html,\n    limitations: 'Integer arithmetic, half-up rounding of each amount to the cent. Only one VAT rounding rule per invoice (per_group or per_line). The workflow stores no counter: it only suggests the next number, and you must check that it is unused. It is not a legal invoice validator, a tax calculation for your country or accounting advice.',\n  };\n}\n\n\nreturn [{ json: computeInvoice($input.first().json) }];\n"
+      },
+      "id": "compute",
+      "name": "Compute invoice",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        160
+      ]
+    }
+  ],
+  "connections": {
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Example invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Example invoice": {
+      "main": [
+        [
+          {
+            "node": "Compute invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
