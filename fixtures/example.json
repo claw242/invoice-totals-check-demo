@@ -1,0 +1,14 @@
+{
+  "invoiceNumber": "F-2026-0007",
+  "issueDate": "2026-11-01",
+  "currency": "EUR",
+  "seller": "Example Studio\n1 Sample Street\n00000 Sampletown",
+  "buyer": "Example Customer <test>",
+  "declaredTotal": "60.30",
+  "lines": [
+    { "description": "Consulting hours", "quantity": "2.5", "unitPrice": "19.99", "vatRate": "20" },
+    { "description": "Sticker", "quantity": "1", "unitPrice": "0.10", "vatRate": "5" },
+    { "description": "Sticker", "quantity": "1", "unitPrice": "0.10", "vatRate": "5" },
+    { "description": "Sticker", "quantity": "1", "unitPrice": "0.10", "vatRate": "5" }
+  ]
+}
