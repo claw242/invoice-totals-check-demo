@@ -1,0 +1,74 @@
+{
+  "invoiceNumber": "F-2026-0007",
+  "issueDate": "2026-11-01",
+  "currency": "EUR",
+  "vatRounding": "per_group",
+  "lines": [
+    {
+      "line": 1,
+      "description": "Consulting hours",
+      "quantity": "2.5",
+      "unitPrice": "19.99",
+      "vatRate": "20",
+      "netCents": 4998,
+      "vatCents": null
+    },
+    {
+      "line": 2,
+      "description": "Sticker",
+      "quantity": "1",
+      "unitPrice": "0.1",
+      "vatRate": "5",
+      "netCents": 10,
+      "vatCents": null
+    },
+    {
+      "line": 3,
+      "description": "Sticker",
+      "quantity": "1",
+      "unitPrice": "0.1",
+      "vatRate": "5",
+      "netCents": 10,
+      "vatCents": null
+    },
+    {
+      "line": 4,
+      "description": "Sticker",
+      "quantity": "1",
+      "unitPrice": "0.1",
+      "vatRate": "5",
+      "netCents": 10,
+      "vatCents": null
+    }
+  ],
+  "vatGroups": [
+    {
+      "vatRate": "5",
+      "netCents": 30,
+      "vatCents": 2
+    },
+    {
+      "vatRate": "20",
+      "netCents": 4998,
+      "vatCents": 1000
+    }
+  ],
+  "totals": {
+    "netCents": 5028,
+    "vatCents": 1002,
+    "grossCents": 6030
+  },
+  "check": {
+    "declaredCents": 6030,
+    "computedCents": 6030,
+    "matches": true,
+    "differenceCents": 0
+  },
+  "suggestedNextNumber": "F-2026-0008",
+  "totalsText": {
+    "net": "50.28",
+    "vat": "10.02",
+    "gross": "60.30"
+  },
+  "limitations": "Integer arithmetic, half-up rounding of each amount to the cent. Only one VAT rounding rule per invoice (per_group or per_line). The workflow stores no counter: it only suggests the next number, and you must check that it is unused. It is not a legal invoice validator, a tax calculation for your country or accounting advice."
+}
